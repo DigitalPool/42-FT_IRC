@@ -1,616 +1,394 @@
-https://www.rfc-editor.org/rfc/rfc2812.html
+# IRC Server Project
 
-# Subject:
-# You must be able to authenticate, set a nickname, a username, join a channel,
-# send and receive private messages using your reference client.
-
-https://modern.ircdocs.horse/#connection-registration
-The PASS command is not required for the connection to be registered, but if included it MUST precede the latter of the NICK and USER commands. i.e it mus tbe sent before you can set nick or username.
-
-
-
-Join Command
-
-	  Command: JOIN
-   Parameters: ( <channel> *( "," <channel> ) [ <key> *( "," <key> ) ] )
-			   / "0"
-
-   The JOIN command is used by a user to request to start listening to
-   the specific channel.  Servers MUST be able to parse arguments in the
-   form of a list of target, but SHOULD NOT use lists when sending JOIN
-   messages to clients.
-
-   Once a user has joined a channel, <he receives information about
-   <all commands his server receives affecting the channel.  This
-   includes JOIN, MODE, KICK, PART, QUIT and of course PRIVMSG / NOTICE>.
-   This allows channel members to keep track of the other channel
-   members, as well as channel modes.
-
-   If a JOIN is <successful>, the user <receives a JOIN message> as
-   confirmation and is <then sent the channel's topic (using RPL_TOPIC) and
-   <the list of users who are on the channel (using RPL_NAMREPLY), which
-   MUST include the user joining.
-
-   Note that <this message accepts a special argument ("0"), which is
-   <a special request to leave all channels the user is currently a member
-   of.>  The server will process this message as if the user had sent
-   a PART command (See Section 3.2.2) for each channel he is a member
-   of.
-
-   Numeric Replies:
-
-		   ERR_NEEDMOREPARAMS              ERR_BANNEDFROMCHAN
-		   ERR_INVITEONLYCHAN              ERR_BADCHANNELKEY
-		   ERR_CHANNELISFULL               ERR_BADCHANMASK
-		   ERR_NOSUCHCHANNEL               ERR_TOOMANYCHANNELS
-		   ERR_TOOMANYTARGETS              ERR_UNAVAILRESOURCE
-		   RPL_TOPIC
-
-   Examples:
-
-   JOIN #foobar                    ; Command to join channel #foobar.
-
-   JOIN &foo fubar                 ; Command to join channel &foo using
-								   key "fubar".
-
-
-
-
-
-
-<PRIVMSG>
-
-3.3.1 Private messages
-
-	  Command: PRIVMSG
-   Parameters: <msgtarget> <text to be sent>
-
-   PRIVMSG is used to send private messages between users, as well as to
-   send messages to channels.  <msgtarget> is usually the nickname of
-   the recipient of the message, or a channel name.
-
-   The <msgtarget> parameter may also be a host mask (#<mask>) or server
-   mask ($<mask>).  In both cases the server will only send the PRIVMSG
-   to those who have a server or host matching the mask.  The mask MUST
-   have at least 1 (one) "." in it and no wildcards following the last
-   ".".  This requirement exists to prevent people sending messages to
-   "#*" or "$*", which would broadcast to all users.  Wildcards are the
-   '*' and '?'  characters.  This extension to the PRIVMSG command is
-   only available to operators.
-
-   Numeric Replies:
-
-		   ERR_NORECIPIENT                 ERR_NOTEXTTOSEND
-		   ERR_CANNOTSENDTOCHAN            ERR_NOTOPLEVEL
-		   ERR_WILDTOPLEVEL                ERR_TOOMANYTARGETS
-		   ERR_NOSUCHNICK
-		   RPL_AWAY
-
-
-4. Channel Modes
-
-   The various modes available for channels are as follows:
-
-		O - give "channel creator" status;
-#        o - give/take channel operator privilege;
-		v - give/take the voice privilege;
-
-		a - toggle the anonymous channel flag;
-#        i - toggle the invite-only channel flag;
-		m - toggle the moderated channel;
-		n - toggle the no messages to channel from clients on the
-			outside;
-		q - toggle the quiet channel flag;
-		p - toggle the private channel flag;
-		s - toggle the secret channel flag;
-		r - toggle the server reop channel flag;
-#        t - toggle the topic settable by channel operator only flag;
-
-#        k - set/remove the channel key (password);
-#        l - set/remove the user limit to channel;
-
-		b - set/remove ban mask to keep users out;
-		e - set/remove an exception mask to override a ban mask;
-		I - set/remove an invitation mask to automatically override
-			the invite-only flag;
-
-
-
-Testing the server
-
-### **1. Review the Project Requirements**
-
-- **Mandatory Features:**
-  - Multi-client handling with non-blocking I/O using a single poll (or equivalent) loop
-  - Authentication using the PASS command
-  - Setting Nicknames and Usernames with NICK and USER commands
-  - Channel management: creating/joining channels, message broadcasting
-  - Channel operator commands: KICK, INVITE, TOPIC, and MODE (with modes i, t, k, o)
-- **Makefile Requirements:**
-  - Ensure the Makefile provides targets: `NAME`, `all`, `clean`, `fclean`, and `re`
+**Author:** mac (mac@student.42.fr)  
+**License:** [MIT License](LICENSE) *(or insert your preferred license text here)*
 
 ---
 
-### **2. Compilation and Build Testing**
+## Overview
 
-- **Compile the Project:**
-  - Run `make` and verify that the server compiles without errors.
-- **Test Makefile Targets:**
-  - Run `make clean` and `make fclean` to ensure proper removal of object files and binaries.
-  - Run `make re` to confirm that the rebuild process works correctly.
+This project implements an IRC (Internet Relay Chat) server in C++98 that conforms to both [RFC 2812](https://www.rfc-editor.org/rfc/rfc2812.html) and modern IRC documentation ([Modern IRC Connection Registration](https://modern.ircdocs.horse/#connection-registration)). The server supports multiple clients using non-blocking I/O with a single `poll()` loop and provides the following core features:
 
----
-
-### **3. Start the Server**
-
-- **Run the Executable:**
-  - Start your server using:
-	```
-	./ircserv <port> <password>
-	```
-  - Use a port between 1024 and 65535. For example:
-	```
-	./ircserv 6667 mypassword
-	```
-- **Monitor Server Output:**
-  - Check that the server prints a “listening” message and is waiting for client connections.
-
----
-
-### **4. Connect Clients to the Server**
-
-- **Using Telnet or Netcat:**
-  - Open multiple terminal windows and connect using:
-	```
-	telnet 127.0.0.1 <port>
-	```
-	or
-	```
-	nc 127.0.0.1 <port>
-	```
-- **Check the Connection:**
-  - You should see the initial welcome message asking for authentication.
+- **Authentication & Registration:**
+  - Clients must authenticate using the `PASS` command (if provided).
+  - If included, `PASS` **MUST** precede the `NICK` and `USER` commands.
+- **User Identification:**
+  - Set a nickname with the `NICK` command.
+  - Set a username with the `USER` command.
+- **Channel Management:**
+  - Clients can join channels using the `JOIN` command. Channel names must start with one of the following characters: `#`, `&`, `+`, or `!`.
+  - When a channel is joined, the server sends a confirmation, the channel’s topic (if set), and a list of users (via numeric replies).
+- **Private Messaging:**
+  - Clients can send private messages using the `PRIVMSG` command.
+  - If the `<msgtarget>` is a channel name, the message is broadcast to all channel members; otherwise, it is delivered to an individual client.
+- **Channel Operator Commands:**
+  - **KICK:** Eject a user from a channel.
+  - **INVITE:** Invite a user to join a channel.
+  - **TOPIC:** View or set the channel’s topic. If channel mode `t` is active, only operators can change it.
+  - **MODE:** Adjust channel modes. Supported modes include:
+    - `i`: Invite-only
+    - `t`: Topic settable only by channel operators
+    - `k`: Channel key (password)
+    - `o`: Grant or remove channel operator privileges  
+    (Additional modes as per RFC and modern extensions can be added as needed.)
+- **Graceful Shutdown:**
+  - The server installs a SIGINT handler so that when Ctrl+C is pressed, all client connections are closed, allocated memory is freed, and a closing message is printed in red.
 
 ---
 
-### **5. Test Authentication**
+## Table of Contents
 
-- **Send the PASS Command:**
-  - Type:
-	```
-	PASS mypassword
-	```
-  - Verify that with the correct password you get a success message and your client is “registered.”
-- **Invalid Password Test:**
-  - Connect a new client and send an incorrect PASS command.
-  - Verify that the server sends an error message and disconnects the client.
-
----
-
-### **6. Test Nickname and Username Commands**
-
-- **Set Nickname:**
-  - After authentication, type:
-	```
-	NICK MyNick
-	```
-  - Verify the server confirms the nickname change.
-- **Set Username:**
-  - Type:
-	```
-	USER MyUser
-	```
-  - Confirm that the username is set with the appropriate success message.
-- **Duplicate Checks:**
-  - Try setting a nickname or username that is already taken and verify that you receive an error message.
+1. [Features](#features)
+2. [Build and Makefile](#build-and-makefile)
+3. [Running the Server](#running-the-server)
+4. [Usage and Commands](#usage-and-commands)
+5. [Testing the Server](#testing-the-server)
+6. [Persistent Buffer & Partial Data Handling](#persistent-buffer--partial-data-handling)
+7. [Graceful Shutdown](#graceful-shutdown)
+8. [Protocol References](#protocol-references)
+9. [Contributing](#contributing)
+10. [License](#license)
 
 ---
 
-### **7. Test Channel Management**
+## Features
 
-- **Join a Channel:**
-  - Type:
-	```
-	JOIN #mychannel
-	```
-  - Verify that if the channel exists, you join it; if not, it is created.
-- **Message Broadcasting:**
-  - From one client in the channel, send a message (e.g., simply type text and press Enter) and confirm that other clients in the channel receive it.
+### Mandatory Features
+- **Multi-Client Handling:**  
+  Uses non-blocking I/O with a single `poll()` loop.
+- **Authentication:**  
+  Clients must send a `PASS` command (if provided) before sending `NICK` and `USER`.
+- **Nickname & Username:**  
+  Clients register using `NICK` and `USER` commands.
+- **Channel Management:**  
+  Clients can create or join channels using `JOIN`. On joining, they receive the channel topic (if set) and the list of channel members.
+- **Private Messaging:**  
+  Clients use `PRIVMSG` to send messages either privately or to channels.
+- **Channel Operator Commands:**  
+  Commands include `KICK`, `INVITE`, `TOPIC`, and `MODE` (with modes `i`, `t`, `k`, `o`).
 
----
-
-### **8. Test Channel Operator Commands**
-
-- **Become an Operator:**
-  - Use the OPER command:
-	```
-	OPER MyNick mypassword
-	```
-  - Verify that you are granted operator status (server should confirm).
-- **Test KICK:**
-  - As an operator in a channel, type:
-	```
-	KICK #mychannel UserX
-	```
-  - Verify that the specified user is removed from the channel and receives a kick notification.
-
-	// You are not an operator message is in main window
-- **Test INVITE:**
-
-  - // you'd see invite message in main irssi window
-  - As an operator, type:
-	```
-	INVITE #mychannel UserY
-	```
-  - Verify that UserY (if connected) receives an invitation message.
-
-- **Test TOPIC Command:**
--
-  - //check topic when you are in the channel
-  - **Viewing Topic:**
-	- Type:
-	  ```
-	  TOPIC #mychannel
-	  ```
-	- If no topic is set, you should get an appropriate message.
-  - **Setting Topic:**
-	- Type:
-	  ```
-	  TOPIC #mychannel New channel topic here
-	  ```
-	- Verify that the topic is updated and a broadcast notification is sent.
-  - **Restricted Topic (mode t):**
-	- After setting mode `+t` (see next step), try changing the topic from a non-operator and verify that it’s denied.
+### Additional Features
+- **Graceful Shutdown:**  
+  SIGINT (Ctrl+C) is handled to free resources and close connections gracefully.
+- **Error Handling:**  
+  Appropriate error messages are returned for invalid commands or conditions (e.g., wrong password, duplicate nicknames).
 
 ---
 
-### **9. Test Channel Modes with MODE Command**
+## Build and Makefile
 
-- **Enable/Disable Modes:**
-  - **Invite-Only Mode (i):**
-    - //works perfectly
-	- As an operator, type:
-	  ```
-	  MODE #mychannel +i
-	  ```
-	- Then, from a non-invited client, try joining the channel and confirm that you get an error.
-  - **Topic Restriction Mode (t):**
-    - //works perfectly
-	- Set the mode:
-	  ```
-	  MODE #mychannel +t
-	  ```
-	- Have a non-operator try to change the topic and verify that it fails.
-  - **Channel Key Mode (k):**
-    - // works perfectly
-	- Set a key by typing:
-	  ```
-	  MODE #mychannel +k secretkey
-	  ```
-	- Try to join the channel without providing the key and verify that access is denied; then join with:
-	  ```
-	  JOIN #mychannel secretkey
-	  ```
-	- Remove the key by:
-	  ```
-	  MODE #mychannel -k
-	  ```
-  - **Operator Privilege Mode (o):**
-	- Grant operator status to another user using:
-	  ```
-	  MODE #mychannel +o OtherNick
-	  ```
-	- Remove operator status with:
-	  ```
-	  MODE #mychannel -o OtherNick
-	  ```
+Your Makefile must provide the following targets:
+- **NAME** – Final executable name.
+- **all**
+- **clean**
+- **fclean**
+- **re**
 
----
-
-### **10. Test Private Messaging**
-
-- **Using PRIVMSG:**
-  - From one client, type:
-	```
-	PRIVMSG OtherNick :Hello in private!
-	```
-  - Confirm that the target client receives the private message with the proper format.
-
----
-
-### **11. Test Disconnection and Cleanup**
-
-- **Client Disconnects:**
-  - Close a client’s connection (e.g., by closing the terminal) and verify that:
-	- The client is removed from the channel.
-	- The server prints a disconnect message.
-- **Resource Cleanup:**
-  - Verify that the poll loop and client maps are updated accordingly.
-
----
-
-### **12. Test Error Handling and Edge Cases**
-
-- **Invalid Commands:**
-  - Send malformed or incomplete commands (e.g., missing parameters) and verify that the server returns appropriate error messages.
-- **Concurrent Clients:**
-  - Connect multiple clients simultaneously and perform various commands concurrently. Check for message integrity and proper handling.
-
----
-
-### **13. Monitor Server Logs and Console Outputs**
-
-- **Check for Debug Logs:**
-  - Review the server’s console output for logs on connections, disconnections, command processing, and errors.
-- **Use Log Files (Optional):**
-  - If you add logging to a file, verify that all critical events are logged.
-
----
-
-### **14. Optional: Automated Testing**
-
-- **Scripted Tests:**
-  - Write simple shell scripts (using `nc` or `telnet`) to automate the sending of commands to simulate multiple client interactions.
-- **Test Scenarios:**
-  - Automate scenarios such as joining channels, sending messages, and using operator commands.
-
-
-
-
-
-
-
-
-To test your IRC server implementation, you can use one of the following IRC clients. These clients are widely used, easy to set up, and compatible with most IRC servers, including your custom server.
-
-
-******************************************
-
-**/server add -auto -tls_pass 12345 localhost 9987*
-**CONNECT localhost 9987 12345*
-**MSG real Hello*
-**JOIN #ch1*
-**MSG User7 helloy*
-**MSG #ch1 Message*
-**quit (IRC client leaves)*
-
-**ctrl + X to switch between networks if it glitches**
-
-delete or stop reconns
-**/rmreconns to abort timed-out connections**
-**/server remove localhost 9985**
-
-
-// to see private messages
-**/query <nick>*
-**/window close** //to close a particular chat or channel window
-
-**//close the window and you would see the private message and the //client message in the**
-**//main window.**
-
-**//if you dont see the message in the main window, go to the /query <nick> window**
-
-//I first messaged local client with <nick>
-
-Then, local client oli received
-
-NICK oli
-Nickname changed to: oli
-[PM from mac
-USER mac mac localhost :mac]: :booni
-PRIVMSG mac mowa
-PRIVMSG mac sho sure
-// all these shows //
-
-// If you create a join the channel with #ch irssi would be able to
-// message everyone in the ch with /MSG #ch1 Message
-**Test sednign PRIVMSG to irrssi client**
-**Modify channel creations so it must start with #**
-
----
-
-### **1. `irssi` (Terminal-Based IRC Client)**
-`irssi` is a popular, lightweight, and highly customizable terminal-based IRC client. It works well for testing IRC servers.
-
-#### Installation:
-- **Linux**:
-  ```bash
-  sudo apt install irssi
-  ```
-- **macOS** (using Homebrew):
-  ```bash
-  brew install irssi
-  ```
-
-#### Usage:
-1. Start `irssi`:
+### Build Instructions
+1. **Clone the Repository:**
    ```bash
-   irssi
+   git clone <repository-url>
+   cd irc-server
    ```
-2. Connect to your server:
+2. **Build the Project:**
+   ```bash
+   make
    ```
-   /connect localhost 9990
+3. **Clean Build Files:**
+   ```bash
+   make clean
    ```
-3. Authenticate:
+4. **Full Clean (including binary):**
+   ```bash
+   make fclean
    ```
-   /msg NickServ IDENTIFY <password>
-   ```
-4. Join a channel:
-   ```
-   /join #ch1
-   ```
-5. Send messages:
-   ```
-   /msg #ch1 Hello, world!
+5. **Rebuild:**
+   ```bash
+   make re
    ```
 
 ---
 
-### **2. `HexChat` (Graphical IRC Client)**
-`HexChat` is a user-friendly graphical IRC client available for Linux, Windows, and macOS.
+## Running the Server
 
-#### Installation:
-- **Linux**:
-  ```bash
-  sudo apt install hexchat
-  ```
-- **macOS** (using Homebrew):
-  ```bash
-  brew install --cask hexchat
-  ```
-- **Windows**: Download the installer from the [official website](https://hexchat.github.io/).
+Run the server with:
+```bash
+./ircserv <port> <password>
+```
+- **`<port>`:** A listening port between 1024 and 65535.
+- **`<password>`:** The connection password. If provided, the `PASS` command must be sent before `NICK` and `USER`.
 
-#### Usage:
-1. Open `HexChat`.
-2. Add your server:
-   - Go to `Network List` > `Add`.
-   - Enter a name for your server (e.g., `MyServer`).
-   - Add a new server: `localhost/9990`.
-3. Connect to your server:
-   - Select your server and click `Connect`.
-4. Authenticate:
-   - If prompted, enter your password.
-5. Join a channel:
-   - Type `/join #ch1` in the input box.
+**Example:**
+```bash
+./ircserv 6667 mypassword
+```
+The server will print a listening message and wait for client connections.
 
 ---
 
-### **3. `weechat` (Terminal-Based IRC Client)**
-`weechat` is another lightweight and extensible terminal-based IRC client.
+## Usage and Commands
 
-#### Installation:
-- **Linux**:
+### Client Commands
+- **PASS `<password>`**: Authenticate with the server.
+- **NICK `<nickname>`**: Set your nickname.
+- **USER `<username>` 0 * :`<realname>`**: Set your username and real name.
+- **JOIN `<channel>`**: Join or create a channel (channel name must start with `#`, `&`, `+`, or `!`).
+- **PRIVMSG `<target>` :`<message>`**: Send a message to a channel or a private message to a user.
+- **QUIT**: Disconnect from the server.
+
+### Channel Operator Commands
+- **KICK `<channel>` `<user>`**: Remove a user from a channel.
+- **INVITE `<channel>` `<user>`**: Invite a user to join a channel.
+- **TOPIC `<channel>` [ `<new topic>` ]**: View or change the channel topic.
+- **MODE `<channel>` `<modes>` [ `<parameters>` ]**: Set channel modes (supported modes: `i`, `t`, `k`, `o`).
+
+---
+
+## Testing the Server
+
+### 1. Using Command-Line Tools (nc / telnet)
+- **Connect using netcat:**
+  ```bash
+  nc 127.0.0.1 6667
+  ```
+  - You will see a welcome message prompting for authentication.
+  - Enter:
+    ```
+    PASS mypassword
+    NICK MyNick
+    USER MyUser
+    ```
+  - **Partial Data Test:**  
+    Use `nc -C` (which sends CRLF) to simulate partial input. For instance, send parts of a command with ctrl‑D between segments; the persistent buffer will aggregate the input until a complete command (terminated by CRLF or LF) is received.
+
+### 2. Using IRC Clients
+
+#### **irssi (Terminal-based)**
+- **Installation:**
+  - Linux:
+    ```bash
+    sudo apt install irssi
+    ```
+  - macOS:
+    ```bash
+    brew install irssi
+    ```
+- **Usage:**
+  1. Start irssi:
+     ```
+     irssi
+     ```
+  2. Add and connect to your server:
+     ```
+     /server add -auto -password mypassword localhost 6667
+     /connect localhost
+     ```
+  3. Join a channel:
+     ```
+     /join #ch1
+     ```
+  4. Send messages:
+     ```
+     /msg #ch1 Hello, world!
+     /msg OtherNick Hello in private!
+     ```
+
+#### **HexChat (Graphical)**
+- **Installation:**
+  - Linux:
+    ```bash
+    sudo apt install hexchat
+    ```
+  - macOS:
+    ```bash
+    brew install --cask hexchat
+    ```
+- **Usage:**
+  1. Open HexChat.
+  2. Create a new network (e.g., `MyServer`) and add your server details (`localhost/6667`).
+  3. Connect to the server and join channels with `/join #ch1`.
+  4. Use `/msg` to send private messages.
+
+#### **weechat (Terminal-based)**
+- **Installation:**
   ```bash
   sudo apt install weechat
   ```
-- **macOS** (using Homebrew):
-  ```bash
-  brew install weechat
-  ```
+- **Usage:**
+  1. Start weechat:
+     ```
+     weechat
+     ```
+  2. Add and connect to your server:
+     ```
+     /server add myserver localhost/6667 -password mypassword
+     /connect myserver
+     ```
+  3. Join a channel:
+     ```
+     /join #ch1
+     ```
 
-#### Usage:
-1. Start `weechat`:
-   ```bash
-   weechat
-   ```
-2. Connect to your server:
-   ```
-   /server add myserver localhost/9990
-   /connect myserver
-   ```
-3. Authenticate:
-   ```
-   /msg NickServ IDENTIFY <password>
-   ```
-4. Join a channel:
-   ```
-   /join #ch1
-   ```
+#### **Other Clients**
+- **mIRC (Windows)** and **Kiwi IRC (Web-based)** are also supported. Follow their standard connection instructions.
 
----
+### 3. Testing Channel & Operator Commands
 
-### **4. `mIRC` (Windows IRC Client)**
-`mIRC` is a popular IRC client for Windows. It has a graphical interface and is easy to use.
+- **JOIN:**  
+  - Command: `JOIN #ch1`  
+  - The server sends a JOIN confirmation, channel topic (if set), and a user list.
+- **OPER:**  
+  - Command: `OPER MyNick mypassword`  
+  - Verifies operator privileges.
+- **KICK:**  
+  - As an operator, type: `KICK #ch1 UserX`  
+  - The target user is removed and notified.
+- **INVITE:**  
+  - As an operator, type: `INVITE #ch1 UserY`  
+  - The invited user receives an invitation message.
+- **TOPIC:**  
+  - To view: `TOPIC #ch1`  
+  - To set: `TOPIC #ch1 New Topic Here`  
+  - If channel mode `t` is set, only operators can change the topic.
+- **MODE:**  
+  - Examples:
+    - `MODE #ch1 +i` (set invite-only)
+    - `MODE #ch1 +k secretkey` (set channel key)
+    - `MODE #ch1 +o OtherNick` (grant operator status)
+    - `MODE #ch1 -i` / `-k` / `-o` (remove modes)
 
-#### Installation:
-- Download the installer from the [official website](https://www.mirc.com/).
+### 4. Testing Error Handling & Edge Cases
 
-#### Usage:
-1. Open `mIRC`.
-2. Add your server:
-   - Go to `Options` > `Connect` > `Servers`.
-   - Add a new server: `localhost` on port `9990`.
-3. Connect to your server:
-   - Select your server and click `Connect`.
-4. Authenticate:
-   - If prompted, enter your password.
-5. Join a channel:
-   - Type `/join #ch1` in the input box.
-
----
-
-### **5. `Kiwi IRC` (Web-Based IRC Client)**
-`Kiwi IRC` is a web-based IRC client that you can use directly in your browser.
-
-#### Usage:
-1. Open [Kiwi IRC](https://kiwiirc.com/).
-2. Enter your server details:
-   - Server: `localhost`
-   - Port: `9990`
-   - Nickname: Choose a nickname.
-3. Click `Start`.
-4. Authenticate:
-   - If prompted, enter your password.
-5. Join a channel:
-   - Type `/join #ch1` in the input box.
+- Send incomplete or malformed commands (e.g., `PRIV` instead of `PRIVMSG`) and verify that appropriate error messages are returned.
+- Test with multiple concurrent connections to ensure stability.
 
 ---
 
-### **6. `nc` (Netcat) or `telnet` (Basic Testing)**
-For quick testing, you can use `nc` (Netcat) or `telnet` to connect to your server and send raw IRC commands.
+## Persistent Buffer & Partial Data Handling
 
-#### Usage with `nc`:
-1. Connect to your server:
-   ```bash
-   nc localhost 9990
-   ```
-2. Authenticate:
-   ```
-   PASS 12345
-   NICK azeez
-   USER azeez 0 * :Azeez User
-   ```
-3. Join a channel:
-   ```
-   JOIN #ch1
-   ```
-4. Send messages:
-   ```
-   PRIVMSG #ch1 Hello, world!
-   ```
-
-#### Usage with `telnet`:
-1. Connect to your server:
-   ```bash
-   telnet localhost 9990
-   ```
-2. Authenticate:
-   ```
-   PASS 12345
-   NICK azeez
-   USER azeez 0 * :Azeez User
-   ```
-3. Join a channel:
-   ```
-   JOIN #ch1
-   ```
-4. Send messages:
-   ```
-   PRIVMSG #ch1 Hello, world!
-   ```
+The server uses a persistent buffer per client to accumulate incoming data until a complete command (terminated by CRLF or LF) is received. This ensures that if a command is sent in parts (for example, using ctrl‑D in `nc`), the server aggregates the data before processing the complete command.
 
 ---
 
-### **Recommendation**
-- For **quick testing**, use `nc` or `telnet`.
-- For **interactive testing**, use `irssi` or `weechat` (terminal-based) or `HexChat` (graphical).
-- For **web-based testing**, use `Kiwi IRC`.
+## Graceful Shutdown
 
-Let me know if you need further assistance!
+The server installs a SIGINT handler so that when you press Ctrl+C in the server’s terminal, it will:
 
+- Close all client connections.
+- Free all allocated memory (clients, channels, pollfd entries).
+- Close the server socket.
+- Print a "Closing server" message in red.
 
+### SIGINT Handling Example
 
+**main.cpp:**
 
+```cpp
+#include "./inc/Server.hpp"
+#include <signal.h>
+#include <cstdlib>
+#include <sstream>
 
-Abort Pending Reconnects:
-Use the following command to cancel all pending reconnections:
+// Global pointer to the server instance.
+Server *g_server = NULL;
 
-/rmreconns
-This will remove the reconnect attempts, so you won't see further reconnect messages.
+// SIGINT handler for graceful shutdown.
+void sigint_handler(int signum) {
+    (void)signum;
+    if (g_server) {
+        g_server->closeServer();
+    }
+    exit(0);
+}
 
-Disconnect from a Server:
-If you’re connected to a server that you don’t need, you can disconnect from it using:
+int main(int argc, char **argv)
+{
+    int port;
+    if (argc != 3) {
+        std::cerr << "Bad amount of arguments! Need 2 -> <port> <password>" << std::endl;
+        return EXIT_FAILURE;
+    }
 
-/server disconnect <server_tag>
-Replace <server_tag> with the identifier for the server (e.g., localhost6).
+    std::string pswrd = argv[2];
+    std::istringstream port_input(argv[1]);
+    if (!(port_input >> port) || !port_input.eof() || port < 1024 || port > 65535) {
+        std::cout << "Invalid input for port number!" << std::endl;
+        return EXIT_FAILURE;
+    }
 
+    try {
+        Server server(argv[1], argv[2]);
+        g_server = &server;
+        signal(SIGINT, sigint_handler);
+        server.startServer();
+        return 0;
+    } catch (const std::exception &ex) {
+        std::cerr << ex.what() << std::endl;
+        return 1;
+    }
+}
+```
+
+**closeServer() Method (in Server.cpp):**
+
+```cpp
+void Server::closeServer() {
+    // Print "Closing server" in red.
+    std::cout << "\033[0;31mClosing server\033[0m" << std::endl;
+    irc_log("Closing server");
+    
+    // Close all client connections and free memory.
+    for (std::map<int, Client *>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
+        int client_fd = it->first;
+        Client *client = it->second;
+        if (client->getChannel()) {
+            client->getChannel()->removeClient(client);
+        }
+        close(client_fd);
+        delete client;
+    }
+    _clients.clear();
+    
+    // Close all poll file descriptors.
+    for (std::vector<pollfd>::iterator it = _pollfds.begin(); it != _pollfds.end(); ++it) {
+        close(it->fd);
+    }
+    _pollfds.clear();
+    
+    // Close the server socket.
+    close(_socket);
+    
+    // Free all channels.
+    for (std::vector<Channel *>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
+        delete *it;
+    }
+    _channels.clear();
+    _running = 0;
+}
+```
+
+---
+
+## Protocol References
+
+- **RFC 2812 – Internet Relay Chat: Client Protocol:**  
+  [RFC 2812](https://www.rfc-editor.org/rfc/rfc2812.html)
+- **Modern IRC Documentation – Connection Registration:**  
+  [Modern IRC Docs](https://modern.ircdocs.horse/#connection-registration)
+
+---
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+1. Fork the repository.
+2. Create a new branch for your feature or bugfix.
+3. Submit a pull request with detailed descriptions of your changes.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
