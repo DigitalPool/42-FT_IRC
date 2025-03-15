@@ -1,7 +1,7 @@
 # IRC Server Project
 
-**Author:** mac (mac@student.42.fr)  
-**License:** [MIT License](LICENSE) *(or insert your preferred license text here)*
+**Author:** AbdulAzeez Shobjao (digitalpoolng@gmail.com)  
+**License:** [MIT License](LICENSE)
 
 ---
 
