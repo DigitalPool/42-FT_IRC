@@ -1,6 +1,6 @@
 # IRC Server Project
 
-**Author:** AbdulAzeez Shobjao (digitalpoolng@gmail.com)  
+**Author:** AbdulAzeez Shobajo (digitalpoolng@gmail.com)  
 **License:** [MIT License](LICENSE)
 
 ---
